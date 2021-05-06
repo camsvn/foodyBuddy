@@ -5,9 +5,9 @@ function diffDate(date1, date2) {
 
 function diffMonth(date1, date2) {
     let months;
-    months = (date2.getFullYear() - date1.getFullYear()) * 12;
-    months -= date1.getMonth();
-    months += date2.getMonth();
+    months = (date2?.getFullYear() - date1?.getFullYear()) * 12;
+    months -= date1?.getMonth();
+    months += date2?.getMonth();
     return months <= 0 ? 0 : months;
 }
 

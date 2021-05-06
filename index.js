@@ -25,105 +25,61 @@ var subscriptionPlans = {
  * 3. can have multiple plan switches during a month, or no plan at all (pay-per-use)
  * 4. If a subscription lasts up to the current date, the user cannot be billed for the current date.
  */
-function getSubscriptionPairs (data) {
-    let subscriptionPairs = [];
-    let subscriptionTemp = [];
 
-    for(let i = 0; i < data.length; i++) {
-        if(data[i].action == "start"){
-            subscriptionTemp = [];
-            subscriptionTemp.push(data[i])
-        } else {
-            subscriptionTemp.push(data[i])
-            subscriptionPairs.push(subscriptionTemp)
+function filterArray(data, type) {
+     return data.filter((item) => item.action === type).map((item,index) => {
+        let date = new Date(item.date)
+        return {...item, date}
+     })
+}
+
+function bufferMonthFill(startSubscriptions, endSubscriptions) {
+   let startBufferFill = [];
+   let endBufferFill = [];
+    for( let i = 0 ; i < startSubscriptions.length ; i++) {
+        let monthDifference = helperFunctions.diffMonth(startSubscriptions[i].date,startSubscriptions[i+1]?.date)
+        let newSubStart = startSubscriptions[i].date
+        startBufferFill.push(startSubscriptions[i])
+        while(monthDifference) {            
+            newSubStart = helperFunctions.addDays(1, helperFunctions.getLastDayOfMonth(newSubStart))
+            startBufferFill.push({...startSubscriptions[i],date: newSubStart})            
+            monthDifference--
         }        
     }
 
-    return subscriptionPairs;
-}
-
-function getSubscriptionPeriods(data) {
-    let output = [];
-    let subscriptionPairs = getSubscriptionPairs(data);
-
-    for(let i = 0; i < subscriptionPairs.length; i++) {
-        for(let j = 0; j < subscriptionPairs[i].length; j++) {
-            if(subscriptionPairs[i][j].action == "start") {
-                let dateStart = new Date(subscriptionPairs[i][j].date);
-                let dateEnd = new Date(subscriptionPairs[i][j+1].date);
-
-                let tempOp = {}
-                tempOp.startDate = dateStart
-                tempOp.endDate = dateEnd
-                tempOp.plan = subscriptionPairs[i][j].plan
-                output.push(tempOp)
-            }
-
-        }
-    }
-    return output;
-}
-
-function splitSubscriptionPeriods (data) {
-    let output = [];
-    let subscriptionPeriods = getSubscriptionPeriods(data);
-    let fillTempObj = (startDate,endDate,plan) => {
-        return {startDate,endDate,plan}
+    let monthDifferenceRecentSub = helperFunctions.diffMonth(startSubscriptions[startSubscriptions.length-1].date,endSubscriptions[endSubscriptions.length-1].date)
+    let newSubStart = startSubscriptions[startSubscriptions.length-1].date
+    while(monthDifferenceRecentSub) {            
+        newSubStart = helperFunctions.addDays(1, helperFunctions.getLastDayOfMonth(newSubStart))
+        startBufferFill.push({...startSubscriptions[startSubscriptions.length-1],date: newSubStart})            
+        monthDifferenceRecentSub--
     }
 
-    for( let i = 0 ; i < subscriptionPeriods.length ; i++) {
-        let subStartDate = subscriptionPeriods[i].startDate;
-        let subEndDate = subscriptionPeriods[i].endDate;
-        let subscribedMonths = helperFunctions.diffMonth(subStartDate,subEndDate);
-
-        if (subscribedMonths === 0) {
-            // console.log(subStartDate,subscriptionPeriods[i-1]?.endDate)
-            if(subStartDate.toDateString() === subscriptionPeriods[i-1]?.endDate.toDateString()) {
-                if(subscriptionPlans[subscriptionPeriods[i].plan] < subscriptionPlans[subscriptionPeriods[i-1]?.plan]) {
-                    output.push({...subscriptionPeriods[i],endDate: subStartDate, plan: subscriptionPeriods[i-1].plan});
-                    subStartDate = helperFunctions.addDays(1, subStartDate);
-                    output.push({...subscriptionPeriods[i],startDate: subStartDate});
-                } else if (subscriptionPlans[subscriptionPeriods[i].plan] > subscriptionPlans[subscriptionPeriods[i-1]?.plan]) {
-                    output.push(subscriptionPeriods[i]);
-                }
-            } else {
-                output.push(subscriptionPeriods[i]);
-            }
-        }
-        
-        if (subscribedMonths > 0) {
-            if(subStartDate.toDateString() === subscriptionPeriods[i-1]?.endDate.toDateString()) {
-                if(subscriptionPlans[subscriptionPeriods[i].plan] < subscriptionPlans[subscriptionPeriods[i-1]?.plan])
-                    subStartDate = helperFunctions.addDays(1, subStartDate);
-            } // Rule 2 & 4
-            let tempStartDate = subStartDate;
-            output.push(fillTempObj(tempStartDate,helperFunctions.getLastDayOfMonth(tempStartDate),subscriptionPeriods[i].plan)) //Split Difference Month
-            while(subscribedMonths) {
-                tempStartDate = helperFunctions.addDays(1, helperFunctions.getLastDayOfMonth(tempStartDate))
-                
-                if(helperFunctions.diffMonth(tempStartDate,subEndDate)) {
-                    output.push(fillTempObj(tempStartDate,helperFunctions.getLastDayOfMonth(tempStartDate),subscriptionPeriods[i].plan))
-                } 
-                subscribedMonths--
-            } //Split Month
+    for( let i = 0 ; i < endSubscriptions.length ; i++) {
+        let monthDifference = helperFunctions.diffMonth(endSubscriptions[i].date,endSubscriptions[i+1]?.date)
+        let newSubEnd = endSubscriptions[i].date
+        endBufferFill.push(endSubscriptions[i])
+        while(monthDifference) {            
+            newSubEnd = helperFunctions.getLastDayOfMonth(newSubEnd)
+            endBufferFill.push({...endSubscriptions[i+1],date: newSubEnd})            
+            monthDifference--
+            newSubEnd = helperFunctions.addDays(1, helperFunctions.getLastDayOfMonth(newSubEnd))
         }
     }
+    return [startBufferFill, endBufferFill]
 
-    return output;
 }
 
-function generateBill(data) {
-    let subscriptionPeriods = splitSubscriptionPeriods(data);
-    return subscriptionPeriods.map((v,i) => (
-        {
-        startDate : helperFunctions.formatDate(v.startDate),
-        endDate : helperFunctions.formatDate(v.endDate),
-        plan : v.plan,
-        amount : helperFunctions.diffDate(v.startDate,v.endDate) * subscriptionPlans[v.plan]
-        }
-    ))
+function generateBill (data) {
+    let subStartArray = filterArray(data,"start")
+    let subEndArray = filterArray(data,"stop")
+
+    // console.log(subStartArray,subEndArray)
+    const [startBufferFill, endBufferFill] = bufferMonthFill(subStartArray,subEndArray)
+    console.log(startBufferFill,endBufferFill)
 }
+
 
 // console.time("logTime")
-console.log(generateBill(mockData))
+generateBill(mockData)
 // console.timeEnd("logTime")
