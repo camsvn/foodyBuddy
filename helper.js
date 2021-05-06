@@ -24,6 +24,11 @@ function getDaysInMonth (month, year) {
 function getLastDayOfMonth (date) {
     return new Date(Date.UTC(date.getFullYear(), date.getMonth() + 1, 0))
 }
+
+function formatDate(date) {
+    let newDate = new Date(date.getTime());    
+    return newDate.toISOString().split('T')[0];
+}
     
 
 module.exports = {
@@ -31,5 +36,6 @@ module.exports = {
     diffMonth,
     addDays,
     getDaysInMonth,
-    getLastDayOfMonth
+    getLastDayOfMonth,
+    formatDate
 }

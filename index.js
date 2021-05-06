@@ -25,16 +25,16 @@ var subscriptionPlans = {
  * 3. can have multiple plan switches during a month, or no plan at all (pay-per-use)
  * 4. If a subscription lasts up to the current date, the user cannot be billed for the current date.
  */
-function getSubscriptionPairs () {
+function getSubscriptionPairs (data) {
     let subscriptionPairs = [];
     let subscriptionTemp = [];
 
-    for(let i = 0; i < mockData.length; i++) {
-        if(mockData[i].action == "start"){
+    for(let i = 0; i < data.length; i++) {
+        if(data[i].action == "start"){
             subscriptionTemp = [];
-            subscriptionTemp.push(mockData[i])
+            subscriptionTemp.push(data[i])
         } else {
-            subscriptionTemp.push(mockData[i])
+            subscriptionTemp.push(data[i])
             subscriptionPairs.push(subscriptionTemp)
         }        
     }
@@ -42,9 +42,9 @@ function getSubscriptionPairs () {
     return subscriptionPairs;
 }
 
-function getSubscriptionPeriods() {
+function getSubscriptionPeriods(data) {
     let output = [];
-    let subscriptionPairs = getSubscriptionPairs();
+    let subscriptionPairs = getSubscriptionPairs(data);
 
     for(let i = 0; i < subscriptionPairs.length; i++) {
         for(let j = 0; j < subscriptionPairs[i].length; j++) {
@@ -53,12 +53,9 @@ function getSubscriptionPeriods() {
                 let dateEnd = new Date(subscriptionPairs[i][j+1].date);
 
                 let tempOp = {}
-                // tempOp.startDate = subscriptionPairs[i][j].date
-                // tempOp.endDate = subscriptionPairs[i][j+1].date
                 tempOp.startDate = dateStart
                 tempOp.endDate = dateEnd
                 tempOp.plan = subscriptionPairs[i][j].plan
-                // tempOp.amount = helperFunctions.diffDate(dateStart,dateEnd) * subscriptionPlans[subscriptionPairs[i][j].plan]
                 output.push(tempOp)
             }
 
@@ -67,9 +64,9 @@ function getSubscriptionPeriods() {
     return output;
 }
 
-function splitSubscriptionPeriods () {
+function splitSubscriptionPeriods (data) {
     let output = [];
-    let subscriptionPeriods = getSubscriptionPeriods();
+    let subscriptionPeriods = getSubscriptionPeriods(data);
     let fillTempObj = (startDate,endDate,plan) => {
         return {startDate,endDate,plan}
     }
@@ -79,16 +76,25 @@ function splitSubscriptionPeriods () {
         let subEndDate = subscriptionPeriods[i].endDate;
         let subscribedMonths = helperFunctions.diffMonth(subStartDate,subEndDate);
 
-        subscribedMonths === 0 && output.push(subscriptionPeriods[i]);
+        if (subscribedMonths === 0) {
+            // console.log(subStartDate,subscriptionPeriods[i-1]?.endDate)
+            if(subStartDate.toDateString() === subscriptionPeriods[i-1]?.endDate.toDateString()) {
+                if(subscriptionPlans[subscriptionPeriods[i].plan] < subscriptionPlans[subscriptionPeriods[i-1]?.plan]) {
+                    output.push({...subscriptionPeriods[i],endDate: subStartDate, plan: subscriptionPeriods[i-1].plan});
+                    subStartDate = helperFunctions.addDays(1, subStartDate);
+                    output.push({...subscriptionPeriods[i],startDate: subStartDate});
+                } else if (subscriptionPlans[subscriptionPeriods[i].plan] > subscriptionPlans[subscriptionPeriods[i-1]?.plan]) {
+                    output.push(subscriptionPeriods[i]);
+                }
+            } else {
+                output.push(subscriptionPeriods[i]);
+            }
+        }
         
-        // if(subStartDate.toDateString() === subscriptionPeriods[i-1]?.endDate.toDateString()) {
-        //     subStartDate = helperFunctions.addDays(1, subEndDate);
-        //     output.push({...subscriptionPeriods[i], startDate: subStartDate})
-        // }
-
-        if( subscribedMonths > 0) {
-            if(subStartDate.toDateString() === subscriptionPeriods[i-1]?.endDate.toDateString()) { 
-                subStartDate = helperFunctions.addDays(1, subStartDate);
+        if (subscribedMonths > 0) {
+            if(subStartDate.toDateString() === subscriptionPeriods[i-1]?.endDate.toDateString()) {
+                if(subscriptionPlans[subscriptionPeriods[i].plan] < subscriptionPlans[subscriptionPeriods[i-1]?.plan])
+                    subStartDate = helperFunctions.addDays(1, subStartDate);
             } // Rule 2 & 4
             let tempStartDate = subStartDate;
             output.push(fillTempObj(tempStartDate,helperFunctions.getLastDayOfMonth(tempStartDate),subscriptionPeriods[i].plan)) //Split Difference Month
@@ -97,10 +103,7 @@ function splitSubscriptionPeriods () {
                 
                 if(helperFunctions.diffMonth(tempStartDate,subEndDate)) {
                     output.push(fillTempObj(tempStartDate,helperFunctions.getLastDayOfMonth(tempStartDate),subscriptionPeriods[i].plan))
-                } else {
-                    if(tempStartDate.toDateString() !== subEndDate.toDateString())
-                        output.push(fillTempObj(tempStartDate,subEndDate,subscriptionPeriods[i].plan))
-                }
+                } 
                 subscribedMonths--
             } //Split Month
         }
@@ -109,9 +112,18 @@ function splitSubscriptionPeriods () {
     return output;
 }
 
+function generateBill(splitSubscriptionPeriods) {
+    return splitSubscriptionPeriods.map((v,i) => (
+        {
+        startDate : helperFunctions.formatDate(v.startDate),
+        endDate : helperFunctions.formatDate(v.endDate),
+        plan : v.plan,
+        amount : helperFunctions.diffDate(v.startDate,v.endDate) * subscriptionPlans[v.plan]
+        }
+    ))
+}
 
 // console.time("logTime")
+let data = splitSubscriptionPeriods(mockData);
+console.log(generateBill(data))
 // console.timeEnd("logTime")
-// splitSubscriptionPeriods();
-
-console.log(splitSubscriptionPeriods())
