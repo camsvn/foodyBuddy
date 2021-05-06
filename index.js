@@ -112,8 +112,9 @@ function splitSubscriptionPeriods (data) {
     return output;
 }
 
-function generateBill(splitSubscriptionPeriods) {
-    return splitSubscriptionPeriods.map((v,i) => (
+function generateBill(data) {
+    let subscriptionPeriods = splitSubscriptionPeriods(data);
+    return subscriptionPeriods.map((v,i) => (
         {
         startDate : helperFunctions.formatDate(v.startDate),
         endDate : helperFunctions.formatDate(v.endDate),
@@ -124,6 +125,5 @@ function generateBill(splitSubscriptionPeriods) {
 }
 
 // console.time("logTime")
-let data = splitSubscriptionPeriods(mockData);
-console.log(generateBill(data))
+console.log(generateBill(mockData))
 // console.timeEnd("logTime")
