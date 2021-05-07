@@ -31,6 +31,13 @@ function print(bills) {
         console.log(`${formatDate(item.startDate)} - ${formatDate(item.endDate)} - ${item.plan} - ${item.amount}`)
     })
 }
+
+function filterArray(data, type) {
+    return data.filter((item) => item.action === type).map((item,index) => {
+       let date = new Date(item.date)
+       return {...item, date}
+    })
+}
     
 
 module.exports = {
@@ -39,5 +46,6 @@ module.exports = {
     addDays,
     getLastDayOfMonth,
     formatDate,
-    print
+    print,
+    filterArray
 }
