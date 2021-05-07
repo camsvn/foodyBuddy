@@ -1,6 +1,6 @@
 function diffDate(date1, date2) {
     let day = 1000*60*60*24;
-    return ((date2 - date1) / day) + 1;
+    return (date2 - date1) / day;
 }
 
 function diffMonth(date1, date2) {
@@ -17,10 +17,6 @@ function addDays (days, date) {
     return newDate;
 };
 
-function getDaysInMonth (month, year) {
-    return new Date(year, month, 0).getDate();
-}
-
 function getLastDayOfMonth (date) {
     return new Date(Date.UTC(date.getFullYear(), date.getMonth() + 1, 0))
 }
@@ -29,13 +25,19 @@ function formatDate(date) {
     let newDate = new Date(date.getTime());    
     return newDate.toISOString().split('T')[0];
 }
+
+function print(bills) {
+    bills.map(item => {
+        console.log(`${formatDate(item.startDate)} - ${formatDate(item.endDate)} - ${item.plan} - ${item.amount}`)
+    })
+}
     
 
 module.exports = {
     diffDate,
     diffMonth,
     addDays,
-    getDaysInMonth,
     getLastDayOfMonth,
-    formatDate
+    formatDate,
+    print
 }

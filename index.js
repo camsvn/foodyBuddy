@@ -7,25 +7,6 @@ var subscriptionPlans = {
     gold : 30 
 }
 
-/**
- * Output Format
- * [{
- *  startdate: 2019-01-01,
- *  enddate: 2019-01-10,
- *  plan: "gold",
- *  amount: 300
- * }]
- */
-
-
-/**
- * Billing Rules:
- * 1. most expensive plan is charged , if multiple plans are changed for the day
- * 2. subscriber is billed for the entire day, even if plan is stopped in day
- * 3. can have multiple plan switches during a month, or no plan at all (pay-per-use)
- * 4. If a subscription lasts up to the current date, the user cannot be billed for the current date.
- */
-
 function filterArray(data, type) {
      return data.filter((item) => item.action === type).map((item,index) => {
         let date = new Date(item.date)
@@ -36,6 +17,8 @@ function filterArray(data, type) {
 function bufferMonthFill(startSubscriptions, endSubscriptions) {
    let startBufferFill = [];
    let endBufferFill = [];
+
+   //pre-startBufferFill
     for( let i = 0 ; i < startSubscriptions.length ; i++) {
         let monthDifference = helperFunctions.diffMonth(startSubscriptions[i].date,startSubscriptions[i+1]?.date)
         let newSubStart = startSubscriptions[i].date
@@ -47,6 +30,7 @@ function bufferMonthFill(startSubscriptions, endSubscriptions) {
         }        
     }
 
+    //post-startBufferFill
     let monthDifferenceRecentSub = helperFunctions.diffMonth(startSubscriptions[startSubscriptions.length-1].date,endSubscriptions[endSubscriptions.length-1].date)
     let newSubStart = startSubscriptions[startSubscriptions.length-1].date
     while(monthDifferenceRecentSub) {            
@@ -55,6 +39,7 @@ function bufferMonthFill(startSubscriptions, endSubscriptions) {
         monthDifferenceRecentSub--
     }
 
+    //endBufferFill
     for( let i = 0 ; i < endSubscriptions.length ; i++) {
         let monthDifference = helperFunctions.diffMonth(endSubscriptions[i].date,endSubscriptions[i+1]?.date)
         let newSubEnd = endSubscriptions[i].date
@@ -67,19 +52,81 @@ function bufferMonthFill(startSubscriptions, endSubscriptions) {
         }
     }
     return [startBufferFill, endBufferFill]
+}
 
+function filterSubs(subscriptions,endSubscriptions) {
+    let output = [];
+
+    subscriptions.map((mItem,index) => {
+
+        let isSubscriptionPushed = output.some(item => {
+            return item.date.getTime() === mItem.date.getTime()
+        })
+
+        let filterArray = subscriptions.filter((fItem) => {
+            return fItem.date.getTime() === mItem.date.getTime()
+        })
+
+        filterArray.length === 1 && output.push(mItem);
+
+        if(filterArray.length > 1 && !isSubscriptionPushed) {
+            let higestPlan = filterArray.reduce((max, item) => 
+            (subscriptionPlans[max.plan] > subscriptionPlans[item.plan] ? max : item)) //filter highest plan of the day
+
+            output.push(higestPlan);
+
+            let lastActivePlanOfDay = filterArray[filterArray.length - 1];
+
+            if(JSON.stringify(higestPlan) !== JSON.stringify(lastActivePlanOfDay)) {
+                output.push(
+                    {...lastActivePlanOfDay,
+                        date: helperFunctions.addDays(1,lastActivePlanOfDay.date)
+                    }) //increment date
+            }            
+        }
+    })
+
+    return output;
 }
 
 function generateBill (data) {
-    let subStartArray = filterArray(data,"start")
-    let subEndArray = filterArray(data,"stop")
+    let subStartArray = filterArray(data,"start");
+    let subEndArray = filterArray(data,"stop");
+    const [sBufferFill, eBufferFill] = bufferMonthFill(subStartArray,subEndArray);
+    let subscriptions = filterSubs(sBufferFill);
+    let endDates = eBufferFill.map( item => item.date);
+    let getEndDate = (fromDate, toDate) => {
+        let endDate;
+        if(toDate !== undefined) {
+            if(helperFunctions.diffDate(fromDate,toDate) === 1) {
+                endDate = fromDate
+            } else if (endDates.some(item => JSON.stringify(item) === JSON.stringify(toDate))) {
+                endDate = helperFunctions.addDays(-1, toDate)
+            } 
+            else {
+                endDate = new Date(endDates.filter(endDate => endDate > fromDate && endDate<toDate).join())
+            }
+        } else {
+            endDate = endDates[endDates.length - 1];
+        }
+        return endDate;       
+    }
 
-    // console.log(subStartArray,subEndArray)
-    const [startBufferFill, endBufferFill] = bufferMonthFill(subStartArray,subEndArray)
-    console.log(startBufferFill,endBufferFill)
+    let billArray = subscriptions.map((item,index) => {
+        let tempObj = {};
+        tempObj.startDate = item.date;
+        tempObj.endDate = getEndDate(item.date,subscriptions[index+1]?.date) ;
+        tempObj.plan = item.plan;
+        tempObj.amount = ( helperFunctions.diffDate(tempObj.startDate,tempObj.endDate) + 1 ) * subscriptionPlans[item.plan];
+
+        return tempObj;
+    })
+
+    return billArray;
 }
 
 
 // console.time("logTime")
-generateBill(mockData)
+const bill = generateBill(mockData)
+helperFunctions.print(bill);
 // console.timeEnd("logTime")
