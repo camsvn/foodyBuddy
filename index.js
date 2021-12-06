@@ -14,10 +14,16 @@ helperFunctions.print(bill);
 
 
 function generateBill (data) {
+    console.log("Input",data);
     let subStartArray = helperFunctions.filterArray(data,"start");
     let subEndArray = helperFunctions.filterArray(data,"stop");
+    console.log("subStartArray",subStartArray);
+    console.log("subEndArray",subEndArray);
     const [sBufferFill, eBufferFill] = bufferMonthFill(subStartArray,subEndArray);
+    console.log("sBufferFill",sBufferFill);
+    console.log("eBufferFill",eBufferFill);
     let subscriptions = filterSubs(sBufferFill);
+    console.log("subscriptions",subscriptions);
     let endDates = eBufferFill.map( item => item.date);
     let getEndDate = (fromDate, toDate) => {
         let endDate;
